@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
-		<title>lib</title>
+		<title>design1</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 		<style>
@@ -21,12 +21,11 @@
 
 	<body>
 
-	<script type="text/javascript" async="" src="lib1/ga.js"></script>
 	<script id="cloudFragShader" type="x-fragment/shader">
 
 
 		</script>
-		<script src="lib/three.js"></script>
+		<script src="https://threejs.org/build/three.min.js"></script>
 		<script src="lib/ShaderGodRays.js"></script>
 		<script src="lib/CloudShader2.js"></script>
 
@@ -60,8 +59,8 @@
 			var orbitRadius = 1;
 
 			var bgColor = 0xee0000;
-			var sunColor = 0xffee00;
-			var mesh;
+			var sunColor = 0xffffff;
+			var mesh, sphere;
 
 			init();
 			animate();
@@ -79,7 +78,28 @@
 
 
 				scene = new THREE.Scene();
-				scene.background = new THREE.Color(0xee0000);
+				var loader = new THREE.TextureLoader();
+
+				// load a resource
+				loader.load(
+					// resource URL
+					'lib/bg.jpg',
+					// Function when resource is loaded
+					function ( texture ) {
+						// do something with the texture
+						scene.background = texture;
+
+					},
+					// Function called when download progresses
+					function ( xhr ) {
+						console.log( (xhr.loaded / xhr.total * 100) + '% loaded' );
+					},
+					// Function called when download errors
+					function ( xhr ) {
+						console.log( 'An error happened' );
+					}
+				);
+
 				scene.fog = new THREE.Fog(0x040306, 100, 300);
 				scene.add(new THREE.AmbientLight(0x404040, 2));
 				var light = new THREE.DirectionalLight(0x000000, 5);
@@ -93,17 +113,60 @@
 				materialScene = new THREE.MeshBasicMaterial( { color: 0x000000, shading: THREE.FlatShading } );
 
 
-				var geometry = new THREE.BoxGeometry(100, 100, 100);
+				var geometry = new THREE.DodecahedronGeometry(80, 0);
 
 			  var material = new THREE.MeshPhongMaterial({
-			    color: 0xfff000,
+			    color: 0xffffff,
 			    specular: 0xffffff,
-			    shininess: 1
+			    shininess: 1,
+					shading: THREE.FlatShading,
+					polygonOffset: true,
+					polygonOffsetFactor: 1,
+					wireframe:true
+
 			  });
 
 			  mesh = new THREE.Mesh(geometry, material);
 
 			  scene.add(mesh);
+
+								// wireframe
+				var geo = new THREE.EdgesGeometry( mesh.geometry ); // or WireframeGeometry
+				var mat = new THREE.LineBasicMaterial( { color: 0xffffff, linewidth: 2 } );
+				var wireframe = new THREE.LineSegments( geo, mat );
+				mesh.add( wireframe );
+
+
+
+// load a resource
+loader.load(
+	// resource URL
+	'lib/smoke_textture.jpg',
+	// Function when resource is loaded
+	function ( texture ) {
+		// do something with the texture
+		var sphere_material = new THREE.MeshBasicMaterial( {
+			map: texture
+		 } );
+
+		 var sphere_geometry = new THREE.SphereGeometry( 60, 32, 32 );
+		 var sphere_mesh = new THREE.Mesh( sphere_geometry, sphere_material );
+		 sphere_mesh.position.set(0, 0, 0)
+		 mesh.add(sphere_mesh);
+
+	},
+	// Function called when download progresses
+	function ( xhr ) {
+		console.log( (xhr.loaded / xhr.total * 100) + '% loaded' );
+	},
+	// Function called when download errors
+	function ( xhr ) {
+		console.log( 'An error happened' );
+	}
+);
+
+
+
 
 				allMeshes = [];
 
@@ -121,11 +184,6 @@
 				renderer.autoClear = false;
 				renderer.setClearColor( bgColor, 1 );
 
-				//
-				//cloudShader = new CloudShader( renderer );
-				//scene.add( cloudShader.cloudMesh );
-				//
-
 				initPostprocessing();
 
 			}
@@ -141,10 +199,10 @@
 				postprocessing.scene.add( postprocessing.camera );
 
 				var pars = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat };
-				postprocessing.rtTextureColors = new THREE.WebGLRenderTarget( window.innerWidth, height, pars );
+				postprocessing.rtTextureColors = new THREE.WebGLRenderTarget( window.innerWidth*2, height*2, pars );
 
 
-				postprocessing.rtTextureDepth = new THREE.WebGLRenderTarget( window.innerWidth, height, pars );
+				postprocessing.rtTextureDepth = new THREE.WebGLRenderTarget( window.innerWidth*2, height*2, pars );
 
 
 				var w = window.innerWidth;
@@ -198,8 +256,8 @@
 			function animate() {
 
 				requestAnimationFrame( animate, renderer.domElement );
-				mesh.rotation.x += 0.01;
-			  mesh.rotation.y += 0.02;
+				mesh.rotation.x += 0.005;
+			  mesh.rotation.y += 0.005;
 
 
 				render();
@@ -253,21 +311,7 @@
 					// space distance to the sun. Not very efficient, so i make a scissor
 					// rectangle around the suns position to avoid rendering surrounding pixels.
 
-					var sunsqH = 0.74 * height; // 0.74 depends on extent of sun from shader
-					var sunsqW = 0.74 * height; // both depend on height because sun is aspect-corrected
 
-					screenSpacePosition.x *= window.innerWidth;
-					screenSpacePosition.y *= height;
-
-					renderer.setScissor( screenSpacePosition.x - sunsqW / 2, screenSpacePosition.y - sunsqH / 2, sunsqW, sunsqH );
-					renderer.enableScissorTest( true );
-
-					postprocessing.godraysFakeSunUniforms[ "fAspect" ].value = window.innerWidth / height;
-
-					postprocessing.scene.overrideMaterial = postprocessing.materialGodraysFakeSun;
-					renderer.render( postprocessing.scene, postprocessing.camera, postprocessing.rtTextureColors );
-
-					renderer.enableScissorTest( false );
 
 					// -- Draw scene objects --
 
@@ -293,7 +337,7 @@
 
 					// Maximum length of god-rays (in texture space [],1]X[0,1])
 
-					var filterLen = 1.0;
+					var filterLen = 0.35;
 
 					// Samples taken by filter
 
